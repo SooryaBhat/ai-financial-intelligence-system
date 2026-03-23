@@ -67,14 +67,13 @@ if uploaded_file is not None:
         df['Profit'] = df['Sales'] * 0.3
 
     # -----------------------------
-    # SAFE DATE HANDLING (FINAL FIX)
+    # FINAL SAFE DATE FIX
     # -----------------------------
-    order_date_data = df['Order Date']
+    # Force single column (very important)
+    df['Order Date'] = df['Order Date'].squeeze()
 
-    if isinstance(order_date_data, pd.DataFrame):
-        order_date_data = order_date_data.iloc[:, 0]
-
-    df['Order Date'] = pd.to_datetime(order_date_data, errors='coerce')
+    # Convert safely
+    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
 
     # Convert numeric safely
     df['Sales'] = pd.to_numeric(df['Sales'], errors='coerce')
@@ -83,13 +82,16 @@ if uploaded_file is not None:
     # Drop invalid rows
     df = df.dropna(subset=['Order Date', 'Sales'])
 
+    # 🔥 CRITICAL FIX (ensures 1D column)
+    df['Order Date'] = pd.Series(df['Order Date'].values)
+
     # -----------------------------
-    # AGGREGATION
+    # AGGREGATION (NOW SAFE)
     # -----------------------------
-    df = df.groupby('Order Date').agg({
+    df = df.groupby('Order Date', as_index=False).agg({
         'Sales': 'sum',
         'Profit': 'sum'
-    }).reset_index()
+    })
 
     df = df.sort_values('Order Date')
 
@@ -206,9 +208,8 @@ if uploaded_file is not None:
     # -----------------------------
     st.subheader("Insights and Recommendations")
 
-    if len(df) > 7:
-        if recent_avg < overall_avg:
-            st.info("Sales have dropped recently. Consider improving marketing or promotions.")
+    if len(df) > 7 and recent_avg < overall_avg:
+        st.info("Sales have dropped recently. Consider improving marketing or promotions.")
 
     if 'anomaly' in df.columns and len(df[df['anomaly'] == 'Yes']) > 0:
         st.info("Unusual spikes detected. Check specific dates.")
