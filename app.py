@@ -13,13 +13,18 @@ uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
+    # -----------------------------
+    # CLEAN COLUMN NAMES
+    # -----------------------------
+    df.columns = df.columns.str.strip()
+
     st.subheader("Raw Dataset Preview")
     st.dataframe(df.head())
 
     # -----------------------------
     # REMOVE DUPLICATE COLUMNS
     # -----------------------------
-    df = df.loc[:, ~df.columns.duplicated()]
+    df = df.loc[:, ~df.columns.duplicated(keep='first')]
 
     # -----------------------------
     # AUTO COLUMN DETECTION
@@ -59,24 +64,28 @@ if uploaded_file is not None:
     if profit_col:
         df.rename(columns={profit_col: 'Profit'}, inplace=True)
     else:
-        df['Profit'] = df['Sales'] * 0.3  # fallback
+        df['Profit'] = df['Sales'] * 0.3
 
     # -----------------------------
-    # SAFE DATA CLEANING
+    # SAFE DATE HANDLING (FINAL FIX)
     # -----------------------------
-    # Ensure single column
-    if isinstance(df['Order Date'], pd.DataFrame):
-        df['Order Date'] = df['Order Date'].iloc[:, 0]
+    order_date_data = df['Order Date']
 
-    # Convert types safely
-    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
+    if isinstance(order_date_data, pd.DataFrame):
+        order_date_data = order_date_data.iloc[:, 0]
+
+    df['Order Date'] = pd.to_datetime(order_date_data, errors='coerce')
+
+    # Convert numeric safely
     df['Sales'] = pd.to_numeric(df['Sales'], errors='coerce')
     df['Profit'] = pd.to_numeric(df['Profit'], errors='coerce')
 
     # Drop invalid rows
     df = df.dropna(subset=['Order Date', 'Sales'])
 
-    # Aggregate
+    # -----------------------------
+    # AGGREGATION
+    # -----------------------------
     df = df.groupby('Order Date').agg({
         'Sales': 'sum',
         'Profit': 'sum'
